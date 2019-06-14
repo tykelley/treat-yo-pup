@@ -1,5 +1,4 @@
-from flask import render_template, request
-from webapp import app
+from flask import Flask, render_template, request
 from sqlalchemy import create_engine
 import numpy as np
 import pandas as pd
@@ -24,6 +23,8 @@ def clean_input(text):
     text = [w for w in text if (w not in remove)]
     return text
 
+
+app = Flask(__name__)
 
 start = time()
 user = 'tk'  # add your username here (same as previous postgreSQL)
@@ -77,3 +78,7 @@ def recommendations(df=df, model=w2vModel):
                          image="https://" + df.iloc[i]['image'],
                          url=base_url + df.iloc[i]['url']))
     return render_template("toys.html", toys=toys)
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
