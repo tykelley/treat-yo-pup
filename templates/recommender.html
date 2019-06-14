@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+{% block title %}Test{% endblock %}
+{% block precontent %}
+    <div class="starter-template">
+        <h2>Welcome to the best recommender eva</h2>
+        <p>Enter some user input yo</p>
+    </div>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <form  action="/toys" method="GET">
+            <div class="form-group">
+                <label for="user_input">Pup description:<br>(250 chars)<br><br></label>
+                <textarea type="text" id="user_input" name='user_input' placeholder="e.g. " rows="3" cols="50" maxlength="250" required></textarea>
+            </div>
+            <div>
+                <button type="submit" class="btn btn-primary btn-lg">Treat yo pup!</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

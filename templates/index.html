@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+{% block title %}Home{% endblock %}
+{% block precontent %}
+    <div class="starter-template">
+        <h1>Treat yo' pup!</h1>
+        <h5>Custom toy recommendations for your furry best friend</h5>
+    </div>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <img src="/static/img/puppy_jake.jpg" height="416" width="312">
+        <br><br><br>
+        <form  action="/recommender" method="GET">
+            <div>
+                <button type="submit" class="btn btn-primary btn-lg" style="height: 100px; width: 500px; font-size: 30pt">Let's get started!</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}
