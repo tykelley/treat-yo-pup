@@ -45,7 +45,7 @@ df = pd.read_sql_query(
     """,
     con
 )
-
+df['tokens'] = df.tokens.str.split()
 print("Loaded DataFrame in {:.2f} s".format(time() - start))
 tmp = time()
 w2vModel = gensim.models.KeyedVectors.load("static/data/w2v_model")
@@ -75,7 +75,7 @@ def recommendations(df=df, model=w2vModel):
     toys = []
     base_url = "https://www.chewy.com/"
     for i, row in results.iterrows():
-        toys.append(dict(sim=row['sims_x'],
+        toys.append(dict(sim=np.round(row['sims_x'] * 100, 2),
                          name=row['name'],
                          image="https://" + row['image'],
                          url=base_url + row['url']))
