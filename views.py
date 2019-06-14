@@ -41,6 +41,7 @@ df = pd.read_sql_query(
     JOIN toys ON reviews.toy_id = toys.id
     JOIN tokens ON reviews.review_id = tokens.review_id
     JOIN product_info ON reviews.toy_id = product_info.toy_id
+    WHERE product_info.avg_rating >= 4 AND product_info.reviews >= 20
     """,
     con
 )
@@ -68,15 +69,16 @@ def recommendations(df=df, model=w2vModel):
     text = request.args.get("user_input")
     text = clean_input(text)
     user_wv = mean_wv(text, w2vModel=model.wv)
-    sims = cosine_similarity(user_wv.reshape(1, -1), review_wv)[0]
-    top_inds = np.argsort(sims)[::-1][:10]
+    df['sims'] = cosine_similarity(user_wv.reshape(1, -1), review_wv)[0]
+    tmp = df.groupby('toy').sims.mean().nlargest(10)
+    results = pd.merge(tmp, df, on='toy').drop_duplicates(subset='toy')
     toys = []
     base_url = "https://www.chewy.com/"
-    for i in top_inds:
-        toys.append(dict(sim=sims[i],
-                         name=df.iloc[i]['name'],
-                         image="https://" + df.iloc[i]['image'],
-                         url=base_url + df.iloc[i]['url']))
+    for i, row in results.iterrows():
+        toys.append(dict(sim=row['sims_x'],
+                         name=row['name'],
+                         image="https://" + row['image'],
+                         url=base_url + row['url']))
     return render_template("toys.html", toys=toys)
 
 
