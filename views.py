@@ -1,27 +1,101 @@
-from flask import Flask, render_template, request
-from sqlalchemy import create_engine
+import re
+import string
+from timeit import default_timer as time
+
+import gensim
+import json
 import numpy as np
 import pandas as pd
 import psycopg2
-import gensim
-import string
-from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
+from flask import Flask, render_template, request
+from lightfm import LightFM
+from multiprocessing import cpu_count
+from scipy.sparse import coo_matrix, csr_matrix, vstack
+from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS as ESW
 from sklearn.metrics.pairwise import cosine_similarity
-import re
-from timeit import default_timer as time
+from sqlalchemy import create_engine
+
+
+ITEM_ALPHA = 1e-6
+NUM_COMPONENTS = 30
+NUM_EPOCHS = 10
+NUM_THREADS = cpu_count() // 2
+
+
+def clean_input(text, bigrams, trigrams):
+    text = text.strip().lower().split()
+    text = [w.translate({ord(k): None for k in string.digits}) for w in text]
+    text = [w for w in text if(w not in ESW and w not in string.punctuation)]
+    text = [re.sub(r'\W', '', w).strip() if hasattr(w, 'strip') else re.sub(r'\W', '', w) for w in text]
+    text = trigrams[bigrams[text]]
+    return text
+
+
+def convert_uim(df, uid_col="user_id", item_col="toy", rating_col="rating", min_rating=None):
+    uim = df.groupby([uid_col, item_col])[rating_col].mean().unstack(fill_value=0)
+    if min_rating is not None:
+        msk = uim.values > min_rating
+        uim.values[msk] = 1
+        uim.values[~msk] = 0
+    return uim
+
+
+def collab_recommendation(interactions, text, keywords, user_features, adj_map, toy_cols, toy_mapper):
+    ua = create_user_vector(text + keywords, adj_map)
+    user_features = vstack([user_features, ua]).tocsr()
+    n_users, n_toys = interactions.shape
+
+    model = LightFM(loss='warp', item_alpha=ITEM_ALPHA, no_components=NUM_COMPONENTS, random_state=42)
+    model.fit(interactions, epochs=NUM_EPOCHS, num_threads=NUM_THREADS)
+    scores = model.predict(n_users-1, np.arange(n_toys), user_features=user_features)
+    inds = np.argsort(scores)[::-1]
+    toy_ids = [toy_mapper[toy_cols[i]] for i in inds]
+    results = pd.DataFrame({"toy_id": toy_ids, "score": scores[inds]})
+    return results
+
+
+def content_recommendation(text, df, model):
+    text = clean_input(text, bigrams, trigrams)
+    user_wv = mean_wv(text, w2vModel=model)
+    try:
+        df['sims'] = cosine_similarity(user_wv.reshape(1, -1), review_wv)[0]
+    except ValueError:
+        return None
+    results = (df.loc[:, ['sims', 'name', 'image', 'url', 'toy_id', 'avg_rating', 'reviews']]
+                 .sort_values("sims", ascending=False)
+                 .drop_duplicates(subset='toy_id'))
+    return results
+
+
+def create_toy_mapper(df, id_col="toy_id", name_col="toy"):
+    return dict(zip(df[name_col].values, df[id_col].values))
+
+
+def create_user_vector(user_inputs, adj_map):
+    user_vector = dict.fromkeys(set(adj_map.values()), 0)
+
+    for col in user_vector:
+        if col in user_inputs:
+            user_vector[col] += 1
+    for col in adj_map:
+        if col in user_inputs:
+            user_vector[adj_map[col]] += 1
+
+    user_vector = pd.DataFrame([user_vector], index=['user'])
+    return user_vector
+
+
+def mark_toy_cols(uim):
+    return {i: k for i, k in enumerate(uim.columns)}
 
 
 def mean_wv(x, w2vModel):
     return np.mean([w2vModel[w] for w in x if w in w2vModel.vocab], axis=0)
 
 
-def clean_input(text):
-    remove = ['th', 'rd', 'st', '']
-    text = text.strip().lower().split()
-    text = [w.translate({ord(k): None for k in string.digits}) for w in text if(w not in ENGLISH_STOP_WORDS and w not in string.punctuation)]
-    text = [re.sub(r'\W', '', w).strip() if hasattr(w, 'strip') else re.sub(r'\W', '', w) for w in text]
-    text = [w for w in text if (w not in remove)]
-    return text
+def merge_recommedations(collab, content):
+    joined = pd.merge(content, collab, how='left', on='toy_id')
+    return joined
 
 
 app = Flask(__name__)
@@ -36,7 +110,9 @@ con = psycopg2.connect(database=dbname, user=user)
 
 df = pd.read_sql_query(
     """
-    SELECT title, review, rating, toys.name AS toy, tokens.tokens, product_info.name, product_info.image, product_info.url
+    SELECT title, review, rating, reviews.user_id, reviews.toy_id,
+           toys.name AS toy, tokens.trigrams AS tokens, product_info.name,
+           product_info.image, product_info.url, product_info.avg_rating, product_info.reviews
     FROM reviews
     JOIN toys ON reviews.toy_id = toys.id
     JOIN tokens ON reviews.review_id = tokens.review_id
@@ -45,12 +121,30 @@ df = pd.read_sql_query(
     """,
     con
 )
-df['tokens'] = df.tokens.str.split()
+
+bigrams = gensim.models.phrases.Phraser.load('static/data/bigram.model')
+trigrams = gensim.models.phrases.Phraser.load('static/data/trigram.model')
+df['tokens'] = df.tokens.str.split().apply(lambda x: [i for i in x if i not in ESW])
 print("Loaded DataFrame in {:.2f} s".format(time() - start))
 tmp = time()
-w2vModel = gensim.models.KeyedVectors.load("static/data/w2v_model")
-review_wv = np.vstack(df.tokens.apply(mean_wv, w2vModel=w2vModel.wv).values)
-print("Reviews word2vec in {:.2f} s ({:.2f} s total)".format(time() - tmp, time() - start))
+w2vModel = gensim.models.KeyedVectors.load_word2vec_format("static/data/w2v_model", binary=True)
+review_wv = np.vstack(df.tokens.apply(mean_wv, w2vModel=w2vModel).values)
+print("Reviews word2vec in {:.2f} s ({:.2f} s total)".format(time() - tmp,
+                                                             time() - start))
+tmp = time()
+uim = convert_uim(df)
+toy_cols = mark_toy_cols(uim)
+toy_mapper = create_toy_mapper(df)
+user_adjs = csr_matrix(pd.read_csv("static/data/user_adj.csv", index_col=0))
+new_user = pd.DataFrame().reindex_like(uim).iloc[:1].fillna(0)
+new_user = new_user.rename(index={1: 'user'})
+uim = coo_matrix(pd.concat([uim, new_user]))
+
+with open("static/data/adj_mapper.txt") as f:
+    adj_map = json.load(f)
+
+print("Loaded UIM data in {:.2f} s ({:.2f} s total)".format(time() - tmp,
+                                                            time() - start))
 
 
 @app.route("/")
@@ -65,20 +159,26 @@ def recommender():
 
 
 @app.route('/toys')
-def recommendations(df=df, model=w2vModel):
+def recommendations(df=df, model=w2vModel, interactions=uim):
     text = request.args.get("user_input")
-    text = clean_input(text)
-    user_wv = mean_wv(text, w2vModel=model.wv)
-    df['sims'] = cosine_similarity(user_wv.reshape(1, -1), review_wv)[0]
-    tmp = df.groupby('toy').sims.mean().nlargest(10)
-    results = pd.merge(tmp, df, on='toy').drop_duplicates(subset='toy')
+    keywords = request.args.getlist("user_keywords")
+    kw_weight = int(request.args.get("user_kw_weight")) / 6
+    content = content_recommendation(text, df.loc[(df.avg_rating >= 4) & (df.reviews >= 20)], model)
+    collab = collab_recommendation(interactions, text, " ".join(keywords),
+                                   user_adjs, adj_map, toy_cols, toy_mapper)
+    joined = content.merge(collab, on="toy_id", how="left")
+    joined['score'] = (joined.score - joined.score.min()) / (joined.score.max() - joined.score.min())
+    joined['avg'] = (joined.sims * (1-kw_weight)) + (joined.score * kw_weight)
+    joined = joined.sort_values("avg", ascending=False).head(10)
     toys = []
     base_url = "https://www.chewy.com/"
-    for i, row in results.iterrows():
-        toys.append(dict(sim=np.round(row['sims_x'] * 100, 2),
-                         name=row['name'],
-                         image="https://" + row['image'],
-                         url=base_url + row['url']))
+    for row in joined.loc[:, ['avg', 'name', 'image', 'url', 'avg_rating', 'reviews']].values:
+        toys.append(dict(sim=np.round(row[0] * 100, 2),
+                         name=row[1],
+                         image="https://" + row[2],
+                         url=base_url + row[3],
+                         stars=row[4],
+                         n_reviews=row[5]))
     return render_template("toys.html", toys=toys)
 
 

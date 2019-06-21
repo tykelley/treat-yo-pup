@@ -2,16 +2,89 @@
 {% block title %}Test{% endblock %}
 {% block precontent %}
     <div class="starter-template">
-        <h2>Welcome to the best recommender eva</h2>
+        <h2>Welcome to the best recommenda eva</h2>
         <p>Enter some user input yo</p>
     </div>
 {% endblock %}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+        .slidecontainer {
+          width: 100%;
+        }
+        
+        .slider {
+          -webkit-appearance: none;
+          width: 100%;
+          height: 25px;
+          background: #d3d3d3;
+          outline: none;
+          opacity: 0.7;
+          -webkit-transition: .2s;
+          transition: opacity .2s;
+        }
+        
+        .slider:hover {
+          opacity: 1;
+        }
+        
+        .slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 25px;
+          height: 25px;
+          background: #4CAF50;
+          cursor: pointer;
+        }
+        
+        .slider::-moz-range-thumb {
+          width: 25px;
+          height: 25px;
+          background: #4CAF50;
+          cursor: pointer;
+        }
+        </style>
 {% block content %}
     <div class="container">
         <form  action="/toys" method="GET">
             <div class="form-group">
-                <label for="user_input">Pup description:<br>(250 chars)<br><br></label>
+                <div><h3>Describe your pup's favorite toys:<br>(250 chars)<br><br></h3</div>
                 <textarea type="text" id="user_input" name='user_input' placeholder="e.g. " rows="3" cols="50" maxlength="250" required></textarea>
+            </div>
+            <br><br>
+            <div >
+                <h3>Describe your dog's new toy in a few key words:</h3>
+            </div>
+            <br>
+            <div>
+                <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+                <link rel="stylesheet" href="https://rawgit.com/dbrekalo/fastselect/master/dist/fastselect.min.css">
+                <script src="https://rawgit.com/dbrekalo/fastsearch/master/dist/fastsearch.min.js"></script>
+                <script src="https://rawgit.com/dbrekalo/fastselect/master/dist/fastselect.min.js"></script>
+
+                <select name="user_keywords" , id="user_feature_options", class="multipleSelect" multiple name="user_features_mult">
+                <option value="durable">Durable</option>
+                <option value="engaging">Engaging</option>
+                <option value="noisy">Makes Noise</option>
+                <option value="quality">Quality</option>
+                <option value="safety">Safety</option>
+                <option value="soft">Soft</option>
+                </select>
+
+                <!-- Javascript to record Multiselect Input Selections -->
+                <script>
+                    $('.multipleSelect').fastselect();
+                    var $user_feature_options = $('user_keywords');
+                </script>
+            </div>
+            <br><br>
+            <div>
+                <h3>Weight your inputs</h3>
+            </div>
+            <br>
+            <div class="form-group slidecontainer">
+                <label for="user_kw_weight">Description</label>
+                <input type="range" id="user_kw_weight" name='user_kw_weight' min="0" max="6" step="1" value="3" class="slider">
+                <label for="user_kw_weight">Keywords</label>
             </div>
             <div>
                 <button type="submit" class="btn btn-primary btn-lg">Treat yo pup!</button>
