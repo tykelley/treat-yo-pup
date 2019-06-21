@@ -93,11 +93,6 @@ def mean_wv(x, w2vModel):
     return np.mean([w2vModel[w] for w in x if w in w2vModel.vocab], axis=0)
 
 
-def merge_recommedations(collab, content):
-    joined = pd.merge(content, collab, how='left', on='toy_id')
-    return joined
-
-
 app = Flask(__name__)
 
 start = time()
@@ -112,19 +107,20 @@ df = pd.read_sql_query(
     """
     SELECT title, review, rating, reviews.user_id, reviews.toy_id,
            toys.name AS toy, tokens.trigrams AS tokens, product_info.name,
-           product_info.image, product_info.url, product_info.avg_rating, product_info.reviews
-    FROM reviews
+           product_info.image, product_info.url, product_info.avg_rating,
+           product_info.reviews
+    FROM final_reviews AS reviews
     JOIN toys ON reviews.toy_id = toys.id
     JOIN tokens ON reviews.review_id = tokens.review_id
     JOIN product_info ON reviews.toy_id = product_info.toy_id
-    WHERE product_info.avg_rating >= 4 AND product_info.reviews >= 20
     """,
     con
 )
 
 bigrams = gensim.models.phrases.Phraser.load('static/data/bigram.model')
 trigrams = gensim.models.phrases.Phraser.load('static/data/trigram.model')
-df['tokens'] = df.tokens.str.split().apply(lambda x: [i for i in x if i not in ESW])
+df['tokens'] = (df.tokens.str.split()
+                         .apply(lambda x: [i for i in x if i not in ESW]))
 print("Loaded DataFrame in {:.2f} s".format(time() - start))
 tmp = time()
 w2vModel = gensim.models.KeyedVectors.load_word2vec_format("static/data/w2v_model", binary=True)
@@ -163,7 +159,7 @@ def recommendations(df=df, model=w2vModel, interactions=uim):
     text = request.args.get("user_input")
     keywords = request.args.getlist("user_keywords")
     kw_weight = int(request.args.get("user_kw_weight")) / 6
-    content = content_recommendation(text, df.loc[(df.avg_rating >= 4) & (df.reviews >= 20)], model)
+    content = content_recommendation(text, df, model)
     collab = collab_recommendation(interactions, text, " ".join(keywords),
                                    user_adjs, adj_map, toy_cols, toy_mapper)
     joined = content.merge(collab, on="toy_id", how="left")
@@ -177,7 +173,7 @@ def recommendations(df=df, model=w2vModel, interactions=uim):
                          name=row[1],
                          image="https://" + row[2],
                          url=base_url + row[3],
-                         stars=row[4],
+                         stars=np.round(row[4], 1),
                          n_reviews=row[5]))
     return render_template("toys.html", toys=toys)
 

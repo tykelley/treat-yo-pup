@@ -1,5 +1,8 @@
 {% extends "layout.html" %}
-{% block title %}Test{% endblock %}
+{% block title %}Toys{% endblock %}
+{% block head %}
+    {{ super() }}
+{% endblock %}
 {% block content %}
     <div class="container">
         <div class="starter-template">
@@ -11,12 +14,16 @@
             <tr>
                 <th>Percent Match</th>
                 <th>Toy Name</th>
+                <th>Reviews</th>
                 <th>Image</th>
             </tr>
             {% for toy in toys %}
             <tr>
                 <td style="vertical-align: middle">{{ toy['sim'] }} %</td>
                 <td style="vertical-align: middle">{{ toy['name']}}</td>
+                <td style="vertical-align: middle">
+                    <p>{{toy['stars']}}/5 <br> ({{toy['n_reviews']}} reviews)</p>
+                </td>
                 <td style="vertical-align: middle"><a href="{{ toy['url'] }}"><img src="{{ toy['image'] }}" height="90" width="90"></a></td>
             </tr>
             {% endfor %}
