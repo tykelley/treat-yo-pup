@@ -2,12 +2,14 @@
 {% block title %}Toys{% endblock %}
 {% block head %}
     {{ super() }}
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
 {% endblock %}
 {% block content %}
     <div class="container">
         <div class="starter-template">
             <h3>Results:</h3>
-            <p class="lead">Below are the top recommendations.</p>
+            <p class="lead">Below are the top recommendations</p>
         </div>
 
         <table class="table table-hover">
@@ -17,18 +19,38 @@
                 <th>Image</th>
                 <th>Price</th>
                 <th>Reviews</th>
+                <th></th>
             </tr>
             {% for toy in toys %}
             <tr>
                 <td style="vertical-align: middle">{{ toy['sim'] }} %</td>
-                <td style="vertical-align: middle; width: 40%">{{ toy['name']}}</td>
-                <td style="vertical-align: middle"><a href="{{ toy['url'] }}"><img src="{{ toy['image'] }}" height="90" width="90"></a></td>
+                <td style="vertical-align: middle; width: 40%">
+                    <a href="{{ toy['url'] }}" style="color: black">
+                        {{ toy['name'].split(",")[0] }}
+                    </a>
+                </td>
+                <td style="vertical-align: middle">
+                    <a href="{{ toy['url'] }}">
+                        <img src="{{ toy['image'] }}" height="90" width="90">
+                    </a>
+                </td>
                 <td style="vertical-align: middle">{{ toy['price'] }}</td>
                 <td style="vertical-align: middle">
-                    <p>{{toy['stars']}}/5 <br> ({{toy['n_reviews']}} reviews)</p>
+                    <p>{{toy['stars']}} / 5 <br> ({{toy['n_reviews']}} reviews)</p>
+                </td>
+                <td style="vertical-align: middle">
+                    <a href="#" title="Matching Review" data-toggle="popover" data-trigger="focus" data-content="{{ toy['review'] }}">
+                        <i class="fa fa-info-circle fa-lg" style="color: rgb(60, 60, 60)"></i>
+                    </a>
                 </td>
             </tr>
             {% endfor %}
         </table>
     </div>
+
+    <script>
+        $(document).ready(function(){
+            $('[data-toggle="popover"]').popover();
+        });
+    </script>
 {% endblock %}

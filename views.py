@@ -2,12 +2,13 @@ import re
 import string
 from timeit import default_timer as time
 
-import gensim
 import json
 import numpy as np
 import pandas as pd
 import psycopg2
 from flask import Flask, render_template, request
+from gensim.models import KeyedVectors as KV
+from gensim.models.phrases import Phraser
 from lightfm import LightFM
 from multiprocessing import cpu_count
 from scipy.sparse import coo_matrix, csr_matrix, vstack
@@ -61,7 +62,8 @@ def content_recommendation(text, df, model):
         df['sims'] = cosine_similarity(user_wv.reshape(1, -1), review_wv)[0]
     except ValueError:
         return None
-    results = (df.loc[:, ['sims', 'name', 'image', 'url', 'toy_id', 'avg_rating', 'reviews', 'price']]
+    cols = ['sims', 'name', 'image', 'url', 'toy_id', 'avg_rating', 'reviews', 'price', 'review']
+    results = (df.loc[:, cols]
                  .sort_values("sims", ascending=False)
                  .drop_duplicates(subset='toy_id'))
     return results
@@ -95,11 +97,14 @@ def mean_wv(x, w2vModel):
 
 app = Flask(__name__)
 
+with open("./.password") as f:
+    password = f.read().strip()
+
 start = time()
 user = 'tk'  # add your username here (same as previous postgreSQL)
 host = 'localhost'
 dbname = 'chewy'
-db = create_engine('postgres://%s%s/%s' % (user, host, dbname))
+db = create_engine('postgres://%s:%s@%s/%s' % (user, password, host, dbname))
 con = None
 con = psycopg2.connect(database=dbname, user=user)
 
@@ -117,13 +122,13 @@ df = pd.read_sql_query(
     con
 )
 
-bigrams = gensim.models.phrases.Phraser.load('static/data/bigram.model')
-trigrams = gensim.models.phrases.Phraser.load('static/data/trigram.model')
+bigrams = Phraser.load('static/data/bigram.model')
+trigrams = Phraser.load('static/data/trigram.model')
 df['tokens'] = (df.tokens.str.split()
                          .apply(lambda x: [i for i in x if i not in ESW]))
 print("Loaded DataFrame in {:.2f} s".format(time() - start))
 tmp = time()
-w2vModel = gensim.models.KeyedVectors.load_word2vec_format("static/data/w2v_model", binary=True)
+w2vModel = KV.load_word2vec_format("static/data/w2v_model", binary=True)
 review_wv = np.vstack(df.tokens.apply(mean_wv, w2vModel=w2vModel).values)
 print("Reviews word2vec in {:.2f} s ({:.2f} s total)".format(time() - tmp,
                                                              time() - start))
@@ -168,7 +173,7 @@ def recommendations(df=df, model=w2vModel, interactions=uim):
     joined = joined.sort_values("avg", ascending=False).head(10)
     toys = []
     base_url = "https://www.chewy.com/"
-    table_cols = ['avg', 'name', 'image', 'url', 'avg_rating', 'reviews', 'price']
+    table_cols = ['avg', 'name', 'image', 'url', 'avg_rating', 'reviews', 'price', 'review']
     for row in joined.loc[:, table_cols].values:
         toys.append(dict(sim=np.round(row[0] * 100, 1),
                          name=row[1],
@@ -176,9 +181,10 @@ def recommendations(df=df, model=w2vModel, interactions=uim):
                          url=base_url + row[3],
                          stars=np.round(row[4], 1),
                          n_reviews=row[5],
-                         price=row[6]))
+                         price=row[6],
+                         review=row[7]))
     return render_template("toys.html", toys=toys)
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run("0.0.0.0", debug=True)

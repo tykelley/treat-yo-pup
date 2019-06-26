@@ -1,9 +1,9 @@
 {% extends "layout.html" %}
-{% block title %}Treat yo' Pup{% endblock %}
+{% block title %}Treat Yo' Pup{% endblock %}
 {% block precontent %}
     <div class="starter-template">
-        <h1>Welcome to the best recommenda eva!</h1>
-        <p>Enter some user input yo</p>
+        <h1>Welcome!</h1>
+        <p>You're pawesome!</p>
     </div>
 {% endblock %}
 {% block content %}
@@ -14,11 +14,11 @@
                     <h3>Describe your pup's favorite toys:</h3>
                     <h6>(250 chars)<br><br></h6>
                 </div>
-                <textarea type="text" id="user_input" name='user_input' placeholder="e.g. " rows="3" cols="75" maxlength="250" required></textarea>
+                <textarea type="text" id="user_input" name='user_input' placeholder="e.g. My dog loves squeaky toys and stuffed animals!" rows="3" cols="75" maxlength="250" required></textarea>
             </div>
             <br><br>
             <div >
-                <h3>Select a few key words:</h3>
+                <h3>Select a few qualities you're looking for:</h3>
             </div>
             <br>
             <div>
@@ -50,7 +50,7 @@
             <div class="form-group slidecontainer">
                 <label style="vertical-align: middle" for="user_kw_weight"><h5>Description</h5></label>
                 <input type="range" id="user_kw_weight" name='user_kw_weight' min="0" max="6" step="1" value="1" class="slider" style="width: 50%; height: 25px;">
-                <label style="vertical-align: middle" for="user_kw_weight"><h5>Keywords</h5></label>
+                <label style="vertical-align: middle" for="user_kw_weight"><h5>Qualities</h5></label>
             </div>
             <br>
             <div>
