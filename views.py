@@ -19,7 +19,7 @@ from sqlalchemy import create_engine
 ITEM_ALPHA = 1e-6
 NUM_COMPONENTS = 30
 NUM_EPOCHS = 10
-NUM_THREADS = cpu_count() // 2
+NUM_THREADS = cpu_count()
 
 
 def clean_input(text, bigrams, trigrams):
@@ -61,7 +61,7 @@ def content_recommendation(text, df, model):
         df['sims'] = cosine_similarity(user_wv.reshape(1, -1), review_wv)[0]
     except ValueError:
         return None
-    results = (df.loc[:, ['sims', 'name', 'image', 'url', 'toy_id', 'avg_rating', 'reviews']]
+    results = (df.loc[:, ['sims', 'name', 'image', 'url', 'toy_id', 'avg_rating', 'reviews', 'price']]
                  .sort_values("sims", ascending=False)
                  .drop_duplicates(subset='toy_id'))
     return results
@@ -108,7 +108,7 @@ df = pd.read_sql_query(
     SELECT title, review, rating, reviews.user_id, reviews.toy_id,
            toys.name AS toy, tokens.trigrams AS tokens, product_info.name,
            product_info.image, product_info.url, product_info.avg_rating,
-           product_info.reviews
+           product_info.reviews, product_info.price
     FROM final_reviews AS reviews
     JOIN toys ON reviews.toy_id = toys.id
     JOIN tokens ON reviews.review_id = tokens.review_id
@@ -168,13 +168,15 @@ def recommendations(df=df, model=w2vModel, interactions=uim):
     joined = joined.sort_values("avg", ascending=False).head(10)
     toys = []
     base_url = "https://www.chewy.com/"
-    for row in joined.loc[:, ['avg', 'name', 'image', 'url', 'avg_rating', 'reviews']].values:
-        toys.append(dict(sim=np.round(row[0] * 100, 2),
+    table_cols = ['avg', 'name', 'image', 'url', 'avg_rating', 'reviews', 'price']
+    for row in joined.loc[:, table_cols].values:
+        toys.append(dict(sim=np.round(row[0] * 100, 1),
                          name=row[1],
-                         image="https://" + row[2],
+                         image=row[2],
                          url=base_url + row[3],
                          stars=np.round(row[4], 1),
-                         n_reviews=row[5]))
+                         n_reviews=row[5],
+                         price=row[6]))
     return render_template("toys.html", toys=toys)
 
 
