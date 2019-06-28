@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+{% block title %}Home{% endblock %}
+{% block precontent %}
+    <div class="starter-template">
+        <h1>Poor Puppy!</h1>
+        <h4>I was unable to find a match using your text:</h4>
+        <p>{{ user_text }}</p>
+    </div>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <img src="https://httpstatusdogs.com/img/424.jpg">
+        <p>Courtesy of <a href="https://httpstatusdogs.com/424-failed-dependency">HTTP Status Dogs</a> (<a href="https://twitter.com/mikeleeorg">@mikeleeorg</a>)</p>
+        <br><br><br>
+        <form  action="/recommender" method="GET">
+            <div>
+                <button type="submit" class="btn btn-primary btn-lg" style="height: 100px; width: 500px; font-size: 30pt">Let's try again!</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

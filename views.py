@@ -104,9 +104,8 @@ start = time()
 user = 'tk'  # add your username here (same as previous postgreSQL)
 host = 'localhost'
 dbname = 'chewy'
-db = create_engine('postgres://%s:%s@%s/%s' % (user, password, host, dbname))
-con = None
-con = psycopg2.connect(database=dbname, user=user)
+db = create_engine('postgresql://%s:%s@%s/%s' % (user, password, host, dbname))
+con = db.connect()
 
 df = pd.read_sql_query(
     """
@@ -165,6 +164,8 @@ def recommendations(df=df, model=w2vModel, interactions=uim):
     keywords = request.args.getlist("user_keywords")
     kw_weight = int(request.args.get("user_kw_weight")) / 6
     content = content_recommendation(text, df, model)
+    if content is None:
+        return render_template("error.html", user_text=text)
     collab = collab_recommendation(interactions, text, " ".join(keywords),
                                    user_adjs, adj_map, toy_cols, toy_mapper)
     joined = content.merge(collab, on="toy_id", how="left")
@@ -183,7 +184,7 @@ def recommendations(df=df, model=w2vModel, interactions=uim):
                          n_reviews=row[5],
                          price=row[6],
                          review=row[7]))
-    return render_template("toys.html", toys=toys)
+    return render_template("toys.html", toys=toys, user_text=text, user_kw=keywords)
 
 
 if __name__ == "__main__":
