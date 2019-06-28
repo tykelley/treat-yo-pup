@@ -4,6 +4,12 @@
     {{ super() }}
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
+    <style>
+        .popover {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
 {% endblock %}
 {% block content %}
     <div class="container">
@@ -40,7 +46,7 @@
                     <p>{{toy['stars']}} / 5 <br> ({{toy['n_reviews']}} reviews)</p>
                 </td>
                 <td style="vertical-align: middle">
-                    <a href="#" title="Matching Review" data-toggle="popover" data-trigger="focus" data-content="{{ toy['review'] }}">
+                    <a href="#" title="Matching Review" data-toggle="popover" data-placement="right" data-trigger="focus" data-content="{{ toy['review'] }}" data-html="true">
                         <i class="fa fa-info-circle fa-lg" style="color: rgb(60, 60, 60)"></i>
                     </a>
                 </td>

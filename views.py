@@ -62,11 +62,14 @@ def content_recommendation(text, df, model):
         df['sims'] = cosine_similarity(user_wv.reshape(1, -1), review_wv)[0]
     except ValueError:
         return None
-    cols = ['sims', 'name', 'image', 'url', 'toy_id', 'avg_rating', 'reviews', 'price', 'review']
+    cols = ['sims', 'name', 'image', 'url', 'toy_id', 'avg_rating', 'reviews', 'price']
     results = (df.loc[:, cols]
                  .sort_values("sims", ascending=False)
                  .drop_duplicates(subset='toy_id'))
-    return results
+    top_revs = (df.groupby("toy_id")
+                  .apply(lambda x: " <br><br> ".join(x.nlargest(columns="sims", n=10).review.values))
+                  .reset_index())
+    return results.merge(top_revs, on="toy_id", how="left")
 
 
 def create_toy_mapper(df, id_col="toy_id", name_col="toy"):
@@ -101,7 +104,7 @@ with open("./.password") as f:
     password = f.read().strip()
 
 start = time()
-user = 'tk'  # add your username here (same as previous postgreSQL)
+user = 'ubuntu'  # add your username here (same as previous postgreSQL)
 host = 'localhost'
 dbname = 'chewy'
 db = create_engine('postgresql://%s:%s@%s/%s' % (user, password, host, dbname))
@@ -174,7 +177,7 @@ def recommendations(df=df, model=w2vModel, interactions=uim):
     joined = joined.sort_values("avg", ascending=False).head(10)
     toys = []
     base_url = "https://www.chewy.com/"
-    table_cols = ['avg', 'name', 'image', 'url', 'avg_rating', 'reviews', 'price', 'review']
+    table_cols = ['avg', 'name', 'image', 'url', 'avg_rating', 'reviews', 'price', 0]
     for row in joined.loc[:, table_cols].values:
         toys.append(dict(sim=np.round(row[0] * 100, 1),
                          name=row[1],
