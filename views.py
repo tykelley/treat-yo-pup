@@ -23,22 +23,12 @@ NUM_EPOCHS = 10
 NUM_THREADS = cpu_count()
 
 
-def clean_input(text, bigrams, trigrams):
+def clean_input(text):
     text = text.strip().lower().split()
     text = [w.translate({ord(k): None for k in string.digits}) for w in text]
     text = [w for w in text if(w not in ESW and w not in string.punctuation)]
     text = [re.sub(r'\W', '', w).strip() if hasattr(w, 'strip') else re.sub(r'\W', '', w) for w in text]
-    text = trigrams[bigrams[text]]
     return text
-
-
-def convert_uim(df, uid_col="user_id", item_col="toy", rating_col="rating", min_rating=None):
-    uim = df.groupby([uid_col, item_col])[rating_col].mean().unstack(fill_value=0)
-    if min_rating is not None:
-        msk = uim.values > min_rating
-        uim.values[msk] = 1
-        uim.values[~msk] = 0
-    return uim
 
 
 def collab_recommendation(interactions, text, keywords, user_features, adj_map, toy_cols, toy_mapper):
@@ -55,8 +45,13 @@ def collab_recommendation(interactions, text, keywords, user_features, adj_map, 
     return results
 
 
+def combine_phrases(text, bigrams, trigrams):
+    text = trigrams[bigrams[text]]
+    return text
+
+
 def content_recommendation(text, df, model):
-    text = clean_input(text, bigrams, trigrams)
+    text = combine_phrases(text, bigrams, trigrams)
     user_wv = mean_wv(text, w2vModel=model)
     try:
         df['sims'] = cosine_similarity(user_wv.reshape(1, -1), review_wv)[0]
@@ -70,6 +65,15 @@ def content_recommendation(text, df, model):
                   .apply(lambda x: " <br><br> ".join(x.nlargest(columns="sims", n=10).review.values))
                   .reset_index())
     return results.merge(top_revs, on="toy_id", how="left")
+
+
+def convert_uim(df, uid_col="user_id", item_col="toy", rating_col="rating", min_rating=None):
+    uim = df.groupby([uid_col, item_col])[rating_col].mean().unstack(fill_value=0)
+    if min_rating is not None:
+        msk = uim.values > min_rating
+        uim.values[msk] = 1
+        uim.values[~msk] = 0
+    return uim
 
 
 def create_toy_mapper(df, id_col="toy_id", name_col="toy"):
@@ -164,12 +168,13 @@ def recommender():
 @app.route('/toys')
 def recommendations(df=df, model=w2vModel, interactions=uim):
     text = request.args.get("user_input")
+    clean_text = clean_input(text)
     keywords = request.args.getlist("user_keywords")
     kw_weight = int(request.args.get("user_kw_weight")) / 6
-    content = content_recommendation(text, df, model)
+    content = content_recommendation(clean_text, df, model)
     if content is None:
         return render_template("error.html", user_text=text)
-    collab = collab_recommendation(interactions, text, " ".join(keywords),
+    collab = collab_recommendation(interactions, clean_text, keywords,
                                    user_adjs, adj_map, toy_cols, toy_mapper)
     joined = content.merge(collab, on="toy_id", how="left")
     joined['score'] = (joined.score - joined.score.min()) / (joined.score.max() - joined.score.min())
